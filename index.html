@@ -290,7 +290,7 @@ const WORDS = [
   { id:170, ar:'المَوْتُ',     ru:'смерть',               tr:'al-mawt',    cat:'akhira' },
   { id:171, ar:'الحَيَاةُ',    ru:'жизнь',                tr:'al-ḥayāh',   cat:'akhira' },
   { id:172, ar:'البَعْثُ',     ru:'воскрешение',          tr:'al-ba‘th',   cat:'akhira' },
-  { id:173, ar:'القِيَامَةُ', ru:'воскрешение',          tr:'al-qiyāma',  cat:'akhira' },
+  { id:173, ar:'القِيَامَةُ', ru:'Воскрешение (День Суда)', tr:'al-qiyāma',  cat:'akhira' },
   { id:174, ar:'الحِسَابُ',    ru:'расчёт',               tr:'al-ḥisāb',   cat:'akhira' },
   { id:175, ar:'المِيزَانُ',   ru:'весы',                 tr:'al-mīzān',   cat:'akhira' },
   { id:176, ar:'الصِّرَاطُ',   ru:'путь, мост',           tr:'aṣ-ṣirāṭ',   cat:'akhira' },
@@ -516,17 +516,18 @@ const Pill = ({ children, bg, color, style = {} }) => (
 // ============================================================
 // ЭКРАН: домашний
 // ============================================================
-const Home = ({ progressMap, onPickCategory, onReviewWeak, onReviewDue, onReset }) => {
+const Home = ({ progressMap, onPickCategory, onReviewWeak, onReviewDue, onLearnNew, onReset }) => {
   const totals = useMemo(() => {
-    let learned = 0, weak = 0, due = 0, seen = 0;
+    let learned = 0, weak = 0, due = 0, seen = 0, fresh = 0;
+    const now = Date.now();
     WORDS.forEach(w => {
       const p = progressMap[w.id] || defaultProgress(w.id);
       if (p.level >= 4) learned++;
       if (p.level === 0 && p.seen > 0) weak++;
-      if (p.nextReview <= Date.now() && p.seen > 0) due++;
-      if (p.seen > 0) seen++;
+      if (p.nextReview <= now && p.seen > 0) due++;
+      if (p.seen > 0) seen++; else fresh++;
     });
-    return { learned, weak, due, seen };
+    return { learned, weak, due, seen, fresh };
   }, [progressMap]);
 
   const categoryStats = useMemo(() => {
@@ -581,6 +582,15 @@ const Home = ({ progressMap, onPickCategory, onReviewWeak, onReviewDue, onReset 
       {/* ПРИОРИТЕТНЫЕ КНОПКИ */}
       <div style={{ display: 'grid', gap: 12, marginBottom: 32 }}>
         <BigAction
+          onClick={onLearnNew}
+          icon={<IconBookOpen size={20} />}
+          title="Учить новые слова"
+          subtitle={`${totals.fresh} ${plural(totals.fresh, 'новое слово', 'новых слова', 'новых слов')} впереди`}
+          bg={C.ink}
+          fg="#FFF8EE"
+          disabled={totals.fresh === 0}
+        />
+        <BigAction
           onClick={onReviewWeak}
           icon={<IconAlert size={20} />}
           title="На повторение"
@@ -593,7 +603,7 @@ const Home = ({ progressMap, onPickCategory, onReviewWeak, onReviewDue, onReset 
           onClick={onReviewDue}
           icon={<IconSparkles size={20} />}
           title="Запланированные на сегодня"
-          subtitle={`${totals.due} ${plural(totals.due, 'карточка', 'карточки', 'карточек')} ждут`}
+          subtitle={`${totals.due} ${plural(totals.due, 'карточка ждёт', 'карточки ждут', 'карточек ждут')}`}
           bg={C.sage}
           fg="#FFF8EE"
           disabled={totals.due === 0}
@@ -1026,13 +1036,11 @@ function App() {
 
   // Загрузка
   useEffect(() => {
-    (() => {
-      try {
-        const v = localStorage.getItem(STORAGE_KEY);
-        if (v) setProgressMap(JSON.parse(v));
-      } catch (e) {}
-      setLoaded(true);
-    })();
+    try {
+      const v = localStorage.getItem(STORAGE_KEY);
+      if (v) setProgressMap(JSON.parse(v));
+    } catch (e) {}
+    setLoaded(true);
   }, []);
 
   // Сохранение
@@ -1084,6 +1092,15 @@ function App() {
     setView({ name: 'session', deck, title: 'ЗАПЛАНИРОВАННЫЕ' });
   };
 
+  const startNewWords = () => {
+    const deck = WORDS.filter(w => {
+      const p = progressMap[w.id];
+      return !p || p.seen === 0;
+    }).slice(0, 15);
+    if (deck.length === 0) return;
+    setView({ name: 'session', deck, title: 'НОВЫЕ СЛОВА' });
+  };
+
   if (!loaded) {
     return (
       <div style={{ minHeight: '100vh', background: C.cream, display: 'grid', placeItems: 'center' }}>
@@ -1123,6 +1140,7 @@ function App() {
           onPickCategory={startCategory}
           onReviewWeak={startWeakReview}
           onReviewDue={startDueReview}
+          onLearnNew={startNewWords}
           onReset={handleReset}
         />
       )}
